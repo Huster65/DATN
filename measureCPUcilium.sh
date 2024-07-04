@@ -1,35 +1,27 @@
- #!/bin/bash
+#!/bin/bash
 
-# Function to get the total memlock of all eBPF programs
-get_total_memlock() {
-    sudo bpftool prog show | awk '/memlock/ {sum += $2} END {print sum}'
+# Function to get the total run_time_ns of all eBPF programs
+get_total_runtime_ns() {
+    sudo bpftool prog show | awk '/run_time_ns/ {sum += $2} END {print sum}'
 }
 
-# Number of samples
-SAMPLE_SECONDS=30
+# Get initial total runtime
+initial_runtime=$(get_total_runtime_ns)
 
-# Count of samples
-SAMPLE_COUNT=0
+# Sleep for 30 seconds
+sleep 30
 
-# Total memlock usage
-TOTAL_MEMLOCK=0
+# Get total runtime after 30 seconds
+final_runtime=$(get_total_runtime_ns)
 
-while [ $SAMPLE_COUNT -lt $SAMPLE_SECONDS ]; do
-    # Get the current total memlock usage
-    current_memlock=$(get_total_memlock)
-    
-    # Add the current memlock usage to the total memlock usage
-    TOTAL_MEMLOCK=$((TOTAL_MEMLOCK + current_memlock))
-    
-    # Increment the sample count
-    SAMPLE_COUNT=$((SAMPLE_COUNT + 1))
-    
-    # Sleep for 1 second
-    sleep 1
-done
+# Calculate the difference in runtime
+runtime_diff=$((final_runtime - initial_runtime))
 
-# Calculate the average memlock usage
-AVG_MEMLOCK=$((TOTAL_MEMLOCK / SAMPLE_SECONDS))
+# Convert 30 seconds to nanoseconds
+interval_ns=$((30 * 1000000000))
 
-echo "Average memlock usage by eBPF programs over $SAMPLE_SECONDS seconds: $AVG_MEMLOCK bytes"
+# Calculate CPU usage percentage
+cpu_usage=$(echo "scale=2; ($runtime_diff / $interval_ns) * 100" | bc)
 
+# Print the CPU usage percentage
+echo "CPU usage by eBPF programs: $cpu_usage%"
