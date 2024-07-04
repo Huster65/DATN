@@ -1,19 +1,34 @@
-import re
+#!/bin/bash
 
-def extract_ram_usage(line):
-    match = re.search(r'memlock (\d+)', line)
-    if match:
-        return int(match.group(1))
-    return 0
+# Function to get the total memlock of all eBPF programs
+get_total_memlock() {
+    sudo bpftool prog show | awk '/memlock/ {sum += $2} END {print sum}'
+}
 
-def calculate_total_ram(file_path):
-    total_ram = 0
-    with open(file_path, 'r') as file:
-        for line in file:
-            total_ram += extract_ram_usage(line)
-    return total_ram
+# Number of samples
+SAMPLE_SECONDS=30
 
-if __name__ == "__main__":
-    file_path = 'bpftool_output.txt'
-    total_ram = calculate_total_ram(file_path)
-    print(f"Tổng RAM sử dụng bởi các chương trình eBPF: {total_ram} bytes")
+# Count of samples
+SAMPLE_COUNT=0
+
+# Total memlock usage
+TOTAL_MEMLOCK=0
+
+while [ $SAMPLE_COUNT -lt $SAMPLE_SECONDS ]; do
+    # Get the current total memlock usage
+    current_memlock=$(get_total_memlock)
+    
+    # Add the current memlock usage to the total memlock usage
+    TOTAL_MEMLOCK=$((TOTAL_MEMLOCK + current_memlock))
+    
+    # Increment the sample count
+    SAMPLE_COUNT=$((SAMPLE_COUNT + 1))
+    
+    # Sleep for 1 second
+    sleep 1
+done
+
+# Calculate the average memlock usage
+AVG_MEMLOCK=$((TOTAL_MEMLOCK / SAMPLE_SECONDS))
+
+echo "Average memlock usage by eBPF programs over $SAMPLE_SECONDS seconds: $AVG_MEMLOCK bytes"
