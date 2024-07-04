@@ -1,5 +1,6 @@
 # DATN
 #Đây là hướng dẫn đo đạc các thông số đã nêu trong quyển đồ án tốt nghiệp
+
 #Đầu tiên chúng ta sẽ chạy các pod curl-hey-pod và hello-pod bằng cách apply 2 file .yaml
   kubectl apply -f hello.yaml
   kubectl apply -f curl-hey-pod.yaml
