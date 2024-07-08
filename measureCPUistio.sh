@@ -1,34 +1,22 @@
 #!/bin/bash
 
-# Đặt tên cho pod và container
-POD_NAME="my-pod"
-CONTAINER_NAME="my-container"
+POD_NAME=hello-pod
+NAMESPACE=default
+CONTAINER_NAME=istio-proxy
+INTERVAL=1  # Khoảng thời gian giữa mỗi lần lấy số liệu
+DURATION=30  # Tổng thời gian đo
 
-# Số giây mẫu
-SAMPLE_SECONDS=30
+sum_cpu_usage=0
+count=0
 
-# Đếm số lần mẫu
-SAMPLE_COUNT=0
+echo "Measuring CPU usage of container $CONTAINER_NAME in pod $POD_NAME for $DURATION seconds..."
 
-# Tổng CPU
-TOTAL_CPU=0
-
-while [ $SAMPLE_COUNT -lt $SAMPLE_SECONDS ]; do
-    # Lấy thông tin sử dụng tài nguyên của container
-    TOP_OUTPUT=$(kubectl top pod $POD_NAME --containers)
-    
-    # Lọc ra dòng chứa tên container và lấy giá trị sử dụng CPU
-    CPU_USAGE=$(echo "$TOP_OUTPUT" | grep $CONTAINER_NAME | awk '{print $3}' | sed 's/m//')
-
-    # Cộng giá trị sử dụng CPU của lần mẫu hiện tại vào tổng CPU
-    TOTAL_CPU=$(echo "$TOTAL_CPU + $CPU_USAGE" | bc)
-
-    # Tăng giá trị của SAMPLE_COUNT lên 1 và dừng 1 giây trước khi thực hiện lần mẫu tiếp theo
-    SAMPLE_COUNT=$((SAMPLE_COUNT + 1))
-    sleep 1
+while [ $count -lt $DURATION ]; do
+    cpu_usage=$(kubectl top pod $POD_NAME --containers --namespace $NAMESPACE | grep $CONTAINER_NAME | awk '{print $3}' | sed >    sum_cpu_usage=$((sum_cpu_usage + cpu_usage))
+    count=$((count + INTERVAL))
+    sleep $INTERVAL
 done
 
-# Tính giá trị trung bình của sử dụng CPU
-AVG_CPU=$(echo "scale=2; $TOTAL_CPU / $SAMPLE_SECONDS" | bc)
+average_cpu_usage=$((sum_cpu_usage / (DURATION / INTERVAL)))
 
-echo "Average CPU usage of container $CONTAINER_NAME in pod $POD_NAME over $SAMPLE_SECONDS seconds: $AVG_CPU mCPU"
+echo "Average CPU usage of container $CONTAINER_NAME in pod $POD_NAME over $DURATION seconds: $average_cpu_usage millicores"
