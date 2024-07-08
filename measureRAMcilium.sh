@@ -1,34 +1,22 @@
 #!/bin/bash
 
-# Function to get the total memlock of all eBPF programs
-get_total_memlock() {
-    sudo bpftool prog show | awk '/memlock/ {sum += $2} END {print sum}'
-}
+total_memlock=0
 
-# Number of samples
-SAMPLE_SECONDS=30
+# Lấy thông tin các chương trình eBPF đang chạy
+prog_list=$(sudo bpftool prog show)
 
-# Count of samples
-SAMPLE_COUNT=0
+# Duyệt qua từng dòng trong danh sách chương trình eBPF
+while read -r line; do
+    if [[ $line =~ memlock ]]; then
+        # Lấy giá trị memlock từ dòng hiện tại
+        memlock=$(echo "$line" | grep -oP 'memlock \K[0-9]+B')
 
-# Total memlock usage
-TOTAL_MEMLOCK=0
+        # Bỏ "B" và chuyển thành giá trị số
+        memlock=${memlock::-1}
 
-while [ $SAMPLE_COUNT -lt $SAMPLE_SECONDS ]; do
-    # Get the current total memlock usage
-    current_memlock=$(get_total_memlock)
-    
-    # Add the current memlock usage to the total memlock usage
-    TOTAL_MEMLOCK=$((TOTAL_MEMLOCK + current_memlock))
-    
-    # Increment the sample count
-    SAMPLE_COUNT=$((SAMPLE_COUNT + 1))
-    
-    # Sleep for 1 second
-    sleep 1
-done
+        # Cộng dồn vào tổng lượng memlock
+        total_memlock=$((total_memlock + memlock))
+    fi
+done <<< "$prog_list"
 
-# Calculate the average memlock usage
-AVG_MEMLOCK=$((TOTAL_MEMLOCK / SAMPLE_SECONDS))
-
-echo "Average memlock usage by eBPF programs over $SAMPLE_SECONDS seconds: $AVG_MEMLOCK bytes"
+echo "Total RAM used by eBPF programs: $total_memlock bytes"
