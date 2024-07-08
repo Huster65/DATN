@@ -1,36 +1,39 @@
 #!/bin/bash
 
-POD_NAME="my-pod"
-CONTAINER_NAME="my-container"
+# Tên của pod và container sidecar
+POD_NAME=hello-pod
+CONTAINER_NAME=istio-proxy
+NAMESPACE=default
 
-# Số giây mẫu
-SAMPLE_SECONDS=30
+# Thời gian theo dõi (5 giây)
+DURATION=5
 
-# Đếm số lần mẫu
-SAMPLE_COUNT=0
+# Thời gian giữa các lần lấy mẫu (1 giây)
+INTERVAL=1
 
-# Tổng RAM
-TOTAL_RAM=0
+# Biến để theo dõi lượng RAM tiêu thụ cao nhất
+max_memory_usage=0
 
-while [ $SAMPLE_COUNT -lt $SAMPLE_SECONDS ]; do
-    TOP_OUTPUT=$(kubectl top pod $POD_NAME --containers)
-    RAM_USAGE=$(echo "$TOP_OUTPUT" | grep $CONTAINER_NAME | awk '{print $3}')
+# Hàm để lấy lượng RAM tiêu thụ của container sidecar
+get_memory_usage() {
+  kubectl top pod $POD_NAME -n $NAMESPACE --containers | grep $CONTAINER_NAME | awk '{print $3}'
+}
 
-    # Xử lý đơn vị RAM và chuyển đổi thành MiB
-    if [[ $RAM_USAGE == *'Mi'* ]]; then
-        RAM_USAGE_MB=$(echo $RAM_USAGE | sed 's/Mi//g' | bc)
-    elif [[ $RAM_USAGE == *'Gi'* ]]; then
-        RAM_USAGE_MB=$(echo "($RAM_USAGE) * 1024" | bc)
-    else
-        echo "Unknown RAM unit for $RAM_USAGE"
-        exit 1
-    fi
+# Bắt đầu theo dõi
+end=$((SECONDS + DURATION))
+while [ $SECONDS -lt $end ]; do
+  memory_usage=$(get_memory_usage)
 
-    TOTAL_RAM=$(echo "$TOTAL_RAM + $RAM_USAGE_MB" | bc)
+  # Loại bỏ các ký tự không phải số (Mi hoặc m)
+  memory_usage=$(echo $memory_usage | tr -d '[:alpha:]')
 
-    SAMPLE_COUNT=$((SAMPLE_COUNT + 1))
-    sleep 1
+  # Chuyển đổi sang số nguyên
+  memory_usage=$(echo $memory_usage | awk '{print int($1)}')
+
+  if (( memory_usage > max_memory_usage )); then
+    max_memory_usage=$memory_usage
+  fi
+  sleep $INTERVAL
 done
 
-AVG_RAM=$(echo "scale=2; $TOTAL_RAM / $SAMPLE_SECONDS" | bc)
-echo "Average RAM usage of container $CONTAINER_NAME in pod $POD_NAME over $SAMPLE_SECONDS seconds: $AVG_RAM MiB"
+echo "Lượng RAM tiêu thụ nhiều nhất của container sidecar $CONTAINER_NAME trong pod $POD_NAME trong $DURATION giây là: ${max_memory_usage}Mi"
